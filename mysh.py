@@ -1,13 +1,14 @@
 import os
 import sys
 import subprocess
-
+#ビルトインか確認
 def built_in_check(cmd):
     if((cmd =="cd") or (cmd == "exit")):
         return True
     else:
         return False 
-    
+
+#cdの実装    
 def mycd(cmd):
     cmdlen = len(cmd)
     if(cmdlen == 1 or cmd[1] == "~"):
@@ -18,12 +19,15 @@ def mycd(cmd):
         else:
             sys.stderr.write("No such file or directory\n")     
 
+#pipeの数をカウント
 def count_pipe(cmd):
     count = 0
     for i in cmd:
         if(i == '|'):
             count += 1
     return count
+
+#pipeの位置で命令を分割
 def split_proc(cmd):
     proc_argv = []
     tmp = []
@@ -36,6 +40,7 @@ def split_proc(cmd):
     proc_argv.append(tmp)
     return proc_argv    
 
+#一応，proc_argvを表示（多分消す）
 def show_proc(proc_argv):
     for i in range(len(proc_argv)):
         print(str(i)+" th Proc")
@@ -50,6 +55,7 @@ def show_proc(proc_argv):
                 print("proc_argv[" +str(j)+ "]: " +proc_argv[i][j])        
         print("")    
 
+#リダイレクトが必要か確認
 def is_redirect(cmd):
     for x in cmd:
         if(x == ">" or x == ">>" or x == "<"):
@@ -62,17 +68,21 @@ while True:
     usr_split = usr_in.split()
     proc_argv = split_proc(usr_split)
     show_proc(proc_argv)
-    for i in range(len(proc_argv)):
-        if(built_in_check(proc_argv[i][0])==False):
+    # コマンドの数だけループ
+    for i in range(len(proc_argv)): 
+        #ビルトインではない場合
+        if(built_in_check(proc_argv[i][0])==False): 
             pid = os.fork()
             if(pid < 0):
                 sys.stderr.write()
             elif(pid == 0):
-                if(is_redirect(proc_argv[i])==True):
+                #レダイレクト処理
+                if(is_redirect(proc_argv[i])==True): 
                     mark = proc_argv[i][-2]
-                    if(mark == ">"):
+                    if(mark == ">"): 
                         try:
-                            fd = open(proc_argv[i][-1],'w')
+                            fd = open(proc_argv[i][-1],'w') 
+                            #必ずcloseするために例外処理
                             try:
                                 fno = fd.fileno()                
                                 os.dup2(fno,sys.stdout.fileno())
@@ -81,7 +91,8 @@ while True:
                             finally:
                                 fd.close
                         except:
-                            sys.stderr.write("file open error")
+                            sys.stderr.write("file open error¥n")
+                    #以下，">"の場合と同様        
                     elif(mark == ">>"):
                         try:
                             fd = open(proc_argv[i][-1],'a')
@@ -93,7 +104,7 @@ while True:
                             finally:
                                 fd.close
                         except:
-                            sys.stderr.write("file open error")
+                            sys.stderr.write("file open error¥n")
 
                     elif(mark == "<"):
                         try:
@@ -106,15 +117,17 @@ while True:
                             finally:
                                 fd.close
                         except:
-                            sys.stderr.write("file open error")
-
+                            sys.stderr.write("file open error¥n")
+                #リダイレクト処理のない通常バージョン
                 else: 
                     if(os.execvp(proc_argv[i][0],proc_argv[i]) < 0):
                         exit(1)                      
-            else:
+            else: 
                 os.waitpid(pid,0)
-        else:
+        #　ビルトインコマンドの処理    
+        else: 
             if(proc_argv[i][0] == "cd"):
                 mycd(proc_argv[i])
             elif(proc_argv[i][0] == "exit"):
                 sys.exit(0)
+#リダイレクトまで終了
