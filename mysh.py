@@ -1,6 +1,5 @@
 import os
 import sys
-import subprocess
 #ビルトインか確認
 def built_in_check(cmd):
     if((cmd =="cd") or (cmd == "exit")):
@@ -62,12 +61,34 @@ def is_redirect(cmd):
             return True
     return False        
 
+#両端以外のパイプ処理，cmdを実行
+def pipe_continue(r_old,w_old,cmd):
+    r_new, w_new = os.pipe()
+    pid = os.fork()
+    if(pid < 0):
+        sys.stderr.write("fork error")
+    elif(pid == 0):
+        os.dup2(r_old,0)
+        os.dup2(w_new,1)
+        os.close(r_old)
+        os.close(w_new)
+        if(os.execvp(cmd[0],cmd) < 0):
+            exit(1)
+    else:
+        #ここで親プロセスのr,wをclose
+        os.close(r_old)
+        os.close(w_old)
+        os.waitpid(pid,0)
+    return r_new,w_new
+
+    
+
 while True:
     sys.stderr.write("mysh$ ")
     usr_in = input() 
     usr_split = usr_in.split()
     proc_argv = split_proc(usr_split)
-    show_proc(proc_argv)
+    #show_proc(proc_argv)
     #パイプ無しの場合
     if(count_pipe(usr_split)==0):
         # コマンドの数だけループ
@@ -79,7 +100,7 @@ while True:
                     if(pid < 0):
                         sys.stderr.write("fork error")
                     elif(pid == 0):
-                        #リダイレクト処理
+                        #リダイレクト処理(ここ関数化させたい)
                         if(is_redirect(proc_argv[i])==True): 
                             mark = proc_argv[i][-2]
                             if(mark == ">"): 
@@ -133,7 +154,7 @@ while True:
                         mycd(proc_argv[i])
                     elif(proc_argv[i][0] == "exit"):
                         sys.exit(0)
-                       
+        """               
     #パイプ処理(とりあえず１段)
     else:
         r,w = os.pipe()
@@ -166,6 +187,42 @@ while True:
             os.close(r)
             os.close(w)
             os.waitpid(pd2,0)
-
-            
-
+            """
+    #パイプ処理(多段)
+    else:
+        #コマンドの数だけ実行
+        cmd_num = len(proc_argv)
+        r_tmp,w_tmp = os.pipe()
+        for i in range(cmd_num):
+            #最初と最後は異なる
+            #最初の処理
+            if(i == 0):
+                pid = os.fork()
+                if(pid < 0):
+                    sys.stderr.write("fork error")
+                elif(pid == 0):
+                        os.close(r_tmp)
+                        os.dup2(w_tmp,1)
+                        os.close(w_tmp)
+                        if(os.execvp(proc_argv[i][0],proc_argv[i]) < 0):
+                            exit(1)
+                else:
+                    os.waitpid(pid,0)
+            #途中の処理
+            elif(i > 0 and i < cmd_num-1):
+                r_tmp,w_tmp = pipe_continue(r_tmp,w_tmp,proc_argv[i])
+            #最後の処理
+            else:
+                pid = os.fork()
+                if(pid < 0):
+                    sys.stderr.write("fork error")
+                elif(pid == 0):
+                    os.close(w_tmp)
+                    os.dup2(r_tmp,0)
+                    os.close(r_tmp)
+                    if(os.execvp(proc_argv[i][0],proc_argv[i]) < 0):
+                        exit(1)
+                else:
+                    os.close(r_tmp)
+                    os.close(w_tmp) 
+                    os.waitpid(pid,0)
