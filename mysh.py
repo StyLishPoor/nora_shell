@@ -68,66 +68,104 @@ while True:
     usr_split = usr_in.split()
     proc_argv = split_proc(usr_split)
     show_proc(proc_argv)
-    # コマンドの数だけループ
-    for i in range(len(proc_argv)): 
-        #ビルトインではない場合
-        if(built_in_check(proc_argv[i][0])==False): 
-            pid = os.fork()
-            if(pid < 0):
-                sys.stderr.write()
-            elif(pid == 0):
-                #レダイレクト処理
-                if(is_redirect(proc_argv[i])==True): 
-                    mark = proc_argv[i][-2]
-                    if(mark == ">"): 
-                        try:
-                            fd = open(proc_argv[i][-1],'w') 
-                            #必ずcloseするために例外処理
-                            try:
-                                fno = fd.fileno()                
-                                os.dup2(fno,sys.stdout.fileno())
-                                if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
-                                    exit(1)
-                            finally:
-                                fd.close
-                        except:
-                            sys.stderr.write("file open error¥n")
-                    #以下，">"の場合と同様        
-                    elif(mark == ">>"):
-                        try:
-                            fd = open(proc_argv[i][-1],'a')
-                            try:
-                                fno = fd.fileno()                
-                                os.dup2(fno,sys.stdout.fileno())
-                                if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
-                                    exit(1)
-                            finally:
-                                fd.close
-                        except:
-                            sys.stderr.write("file open error¥n")
+    #パイプ無しの場合
+    if(count_pipe(usr_split)==0):
+        # コマンドの数だけループ
+        for i in range(len(proc_argv)): 
 
-                    elif(mark == "<"):
-                        try:
-                            fd = open(proc_argv[i][-1],'r')
-                            try:
-                                fno = fd.fileno()                
-                                os.dup2(fno,sys.stdin.fileno())
-                                if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
-                                    exit(1)
-                            finally:
-                                fd.close
-                        except:
-                            sys.stderr.write("file open error¥n")
-                #リダイレクト処理のない通常バージョン
+            #ビルトインではない場合
+                if(built_in_check(proc_argv[i][0])==False): 
+                    pid = os.fork()
+                    if(pid < 0):
+                        sys.stderr.write("fork error")
+                    elif(pid == 0):
+                        #リダイレクト処理
+                        if(is_redirect(proc_argv[i])==True): 
+                            mark = proc_argv[i][-2]
+                            if(mark == ">"): 
+                                try:
+                                    fd = open(proc_argv[i][-1],'w') 
+                                    #必ずcloseするために例外処理
+                                    try:
+                                        fno = fd.fileno()                
+                                        os.dup2(fno,sys.stdout.fileno())
+                                        if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
+                                            exit(1)
+                                    finally:
+                                        fd.close
+                                except:
+                                    sys.stderr.write("file open error¥n")
+                            #以下，">"の場合と同様        
+                            elif(mark == ">>"):
+                                try:
+                                    fd = open(proc_argv[i][-1],'a')
+                                    try:
+                                        fno = fd.fileno()                
+                                        os.dup2(fno,sys.stdout.fileno())
+                                        if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
+                                            exit(1)
+                                    finally:
+                                        fd.close
+                                except:
+                                    sys.stderr.write("file open error¥n")
+
+                            elif(mark == "<"):
+                                try:
+                                    fd = open(proc_argv[i][-1],'r')
+                                    try:
+                                        fno = fd.fileno()                
+                                        os.dup2(fno,sys.stdin.fileno())
+                                        if(os.execvp(proc_argv[i][0],proc_argv[i][0:-2]) < 0):
+                                            exit(1)
+                                    finally:
+                                        fd.close
+                                except:
+                                    sys.stderr.write("file open error¥n")
+                        #リダイレクト処理のない通常バージョン
+                        else: 
+                            if(os.execvp(proc_argv[i][0],proc_argv[i]) < 0):
+                                exit(1)                      
+                    else: 
+                        os.waitpid(pid,0)
+                #　ビルトインコマンドの処理    
                 else: 
-                    if(os.execvp(proc_argv[i][0],proc_argv[i]) < 0):
-                        exit(1)                      
-            else: 
-                os.waitpid(pid,0)
-        #　ビルトインコマンドの処理    
-        else: 
-            if(proc_argv[i][0] == "cd"):
-                mycd(proc_argv[i])
-            elif(proc_argv[i][0] == "exit"):
-                sys.exit(0)
-#リダイレクトまで終了
+                    if(proc_argv[i][0] == "cd"):
+                        mycd(proc_argv[i])
+                    elif(proc_argv[i][0] == "exit"):
+                        sys.exit(0)
+                       
+    #パイプ処理(とりあえず１段)
+    else:
+        r,w = os.pipe()
+        pd1 = os.fork()
+        #最初のプロセス（lsとか）
+        if(pd1 < 0):
+            sys.stderr.write("fork error")
+        elif(pd1 == 0):
+            os.close(r)
+            #まず，標準出力を書き込み領域へ
+            os.dup2(w,1)
+            os.close(w)
+            if(os.execvp(proc_argv[0][0],proc_argv[0]) < 0):
+                exit(1)
+        else:
+            os.waitpid(pd1,0)
+        
+        #次のプロセス（grepとかwcとか）
+        pd2 = os.fork()
+        if(pd2 < 0):
+            sys.stderr.write("fork error")
+        elif(pd2 == 0):
+            os.close(w)
+        #読み取り領域から標準入力へ
+            os.dup2(r,0)
+            os.close(r)
+            if(os.execvp(proc_argv[1][0],proc_argv[1]) < 0):
+                exit(1)
+        else:
+            os.close(r)
+            os.close(w)
+            os.waitpid(pd2,0)
+
+            
+
