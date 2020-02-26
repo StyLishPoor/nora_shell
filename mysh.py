@@ -154,7 +154,7 @@ while True:
                         mycd(proc_argv[i])
                     elif(proc_argv[i][0] == "exit"):
                         sys.exit(0)
-        """               
+                      
     #パイプ処理(とりあえず１段)
     else:
         r,w = os.pipe()
@@ -187,7 +187,7 @@ while True:
             os.close(r)
             os.close(w)
             os.waitpid(pd2,0)
-            """
+            
     #パイプ処理(多段)
     else:
         #コマンドの数だけ実行
