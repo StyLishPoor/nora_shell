@@ -154,40 +154,7 @@ while True:
                         mycd(proc_argv[i])
                     elif(proc_argv[i][0] == "exit"):
                         sys.exit(0)
-                      
-    #パイプ処理(とりあえず１段)
-    else:
-        r,w = os.pipe()
-        pd1 = os.fork()
-        #最初のプロセス（lsとか）
-        if(pd1 < 0):
-            sys.stderr.write("fork error")
-        elif(pd1 == 0):
-            os.close(r)
-            #まず，標準出力を書き込み領域へ
-            os.dup2(w,1)
-            os.close(w)
-            if(os.execvp(proc_argv[0][0],proc_argv[0]) < 0):
-                exit(1)
-        else:
-            os.waitpid(pd1,0)
-        
-        #次のプロセス（grepとかwcとか）
-        pd2 = os.fork()
-        if(pd2 < 0):
-            sys.stderr.write("fork error")
-        elif(pd2 == 0):
-            os.close(w)
-        #読み取り領域から標準入力へ
-            os.dup2(r,0)
-            os.close(r)
-            if(os.execvp(proc_argv[1][0],proc_argv[1]) < 0):
-                exit(1)
-        else:
-            os.close(r)
-            os.close(w)
-            os.waitpid(pd2,0)
-            
+                        
     #パイプ処理(多段)
     else:
         #コマンドの数だけ実行
@@ -226,3 +193,38 @@ while True:
                     os.close(r_tmp)
                     os.close(w_tmp) 
                     os.waitpid(pid,0)
+    """
+    #パイプ処理(とりあえず１段)
+    else:
+        r,w = os.pipe()
+        pd1 = os.fork()
+        #最初のプロセス（lsとか）
+        if(pd1 < 0):
+            sys.stderr.write("fork error")
+        elif(pd1 == 0):
+            os.close(r)
+            #まず，標準出力を書き込み領域へ
+            os.dup2(w,1)
+            os.close(w)
+            if(os.execvp(proc_argv[0][0],proc_argv[0]) < 0):
+                exit(1)
+        else:
+            os.waitpid(pd1,0)
+        
+        #次のプロセス（grepとかwcとか）
+        pd2 = os.fork()
+        if(pd2 < 0):
+            sys.stderr.write("fork error")
+        elif(pd2 == 0):
+            os.close(w)
+        #読み取り領域から標準入力へ
+            os.dup2(r,0)
+            os.close(r)
+            if(os.execvp(proc_argv[1][0],proc_argv[1]) < 0):
+                exit(1)
+        else:
+            os.close(r)
+            os.close(w)
+            os.waitpid(pd2,0)
+     
+    """  
